@@ -7,6 +7,9 @@ class Neq(object):
     def __eq__(self,other):
         return False
 
+    def __repr__(self):
+        return "<Beyond end of sequence>"
+
 class PyV8Test(unittest.TestCase):
     def setUp(self):
         self.ctx = PyV8.JSContext()
@@ -17,10 +20,11 @@ class PyV8Test(unittest.TestCase):
         self.assertEqual(o1,o2)
 
     def assertSeqEqual(self,s1,s2):
-        return all((i1==i2
-                    for i1,i2
-                    in itertools.izip_longest(s1,s2,fillvalue=Neq())))
-
+        self.assertEqual(set(s1),set(s2))
+        # for i, (i1,i2) in enumerate(
+        #         itertools.izip_longest(s1,s2,fillvalue=Neq())):
+        #     self.assertEqual(i1,i2)
+                        
 class StringTests(PyV8Test):
     def test_js_to_py_string(self):
         self.assertStrongerEqual(self.ctx.eval('"abc"'),u"abc")

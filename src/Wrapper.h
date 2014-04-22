@@ -86,6 +86,11 @@ public:
   void DelAttr(const std::string& name);
 
   py::list GetAttrList(void);
+  py::list GetValueList(void);
+  py::list GetItemList(void);
+  py::object GetAttrIter(void);
+  py::object GetItemIter(void);
+  py::object GetValueIter(void);
 
   int GetIdentityHash(void);
   CJavascriptObjectPtr Clone(void);
@@ -255,6 +260,32 @@ public:
   v8::Handle<v8::Context> Context(void) const { return v8::Local<v8::Context>::New(v8::Isolate::GetCurrent(), m_ctxt); }
 
   static void Trace(v8::Handle<v8::Context> ctxt, LivingMap *living);
+};
+
+class CJavascriptObjectItemIterator
+{
+  v8::Persistent<v8::Object> m_obj;
+  v8::Persistent<v8::Array> m_props;
+  unsigned int i;
+  CJavascriptObjectItemIterator() {}
+public:
+  CJavascriptObjectItemIterator(v8::Handle<v8::Object> obj);
+  ~CJavascriptObjectItemIterator();
+  py::object Next();
+  inline void Nop() {}
+};
+
+class CJavascriptObjectValueIterator
+{
+  v8::Persistent<v8::Object> m_obj;
+  v8::Persistent<v8::Array> m_props;
+  unsigned int i;
+  CJavascriptObjectValueIterator() {}
+public:
+  CJavascriptObjectValueIterator(v8::Handle<v8::Object> obj);
+  ~CJavascriptObjectValueIterator();
+  py::object Next();
+  inline void Nop() {}
 };
 
 #endif

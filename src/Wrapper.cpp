@@ -27,6 +27,21 @@
     throw CJavascriptException("Javascript object out of context", PyExc_UnboundLocalError); \
   }
 
+template <class exposed>
+static py::object py_object_via_shared(exposed* new_obj)
+{
+  return py::object(py::handle<>(boost::python::converter::shared_ptr_to_python<exposed>(boost::shared_ptr<exposed>(new_obj))));
+
+}
+
+template <class exposed>
+static void wrap_shared_ptr()
+{
+  py::objects::class_value_wrapper<boost::shared_ptr<exposed>,
+    py::objects::make_ptr_instance<exposed,
+    py::objects::pointer_holder<boost::shared_ptr<exposed>,exposed> > >();
+}
+
 std::ostream& operator <<(std::ostream& os, const CJavascriptObject& obj)
 {
   obj.Dump(os);
@@ -54,6 +69,11 @@ void CWrapper::Expose(void)
 
     // Emulating dict object
     .def("keys", &CJavascriptObject::GetAttrList, "Get a list of an object's attributes.")
+    .def("values", &CJavascriptObject::GetValueList, "Get a list of an object's values.")
+    .def("items", &CJavascriptObject::GetItemList, "Get a list of an object's (key,value) tuples.")
+    .def("iterkeys", &CJavascriptObject::GetAttrIter, "Get an iterator of an object's attributes.")
+    .def("iteritems", &CJavascriptObject::GetItemIter, "Get an iterator of an object's (key,value) tuples.")
+    .def("itervalues", &CJavascriptObject::GetValueIter, "Get an iterator of an object's values.")
 
     .def("__getitem__", &CJavascriptObject::GetAttr)
     .def("__setitem__", &CJavascriptObject::SetAttr)
@@ -132,9 +152,21 @@ void CWrapper::Expose(void)
     .add_property("coloff", &CJavascriptFunction::GetColumnOffset, "The column offset of function in the script")
     ;
 
-  py::objects::class_value_wrapper<boost::shared_ptr<CJavascriptObject>,
-    py::objects::make_ptr_instance<CJavascriptObject,
-    py::objects::pointer_holder<boost::shared_ptr<CJavascriptObject>,CJavascriptObject> > >();
+  py::class_<CJavascriptObjectItemIterator, 
+	     boost::noncopyable>("JSObject_item_iterator", py::no_init)
+    .def("next", &CJavascriptObjectItemIterator::Next)
+    .def("__iter__", &CJavascriptObjectItemIterator::Nop, py::return_self<>() )
+    ;
+
+  py::class_<CJavascriptObjectValueIterator, 
+	     boost::noncopyable>("JSObject_value_iterator", py::no_init)
+    .def("next", &CJavascriptObjectValueIterator::Next)
+    .def("__iter__", &CJavascriptObjectValueIterator::Nop, py::return_self<>() )
+    ;
+
+  wrap_shared_ptr<CJavascriptObject>();
+  wrap_shared_ptr<CJavascriptObjectItemIterator>();
+  wrap_shared_ptr<CJavascriptObjectValueIterator>();
 }
 
 void CPythonObject::ThrowIf(v8::Isolate* isolate)
@@ -1032,6 +1064,7 @@ void CJavascriptObject::DelAttr(const std::string& name)
   if (!Object()->Delete(attr_name))
     CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
 }
+
 py::list CJavascriptObject::GetAttrList(void)
 {
   CHECK_V8_CONTEXT();
@@ -1055,6 +1088,114 @@ py::list CJavascriptObject::GetAttrList(void)
   if (try_catch.HasCaught()) CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
 
   return attrs;
+}
+
+py::list CJavascriptObject::GetValueList(void)
+{
+  CHECK_V8_CONTEXT();
+
+  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+  CPythonGIL python_gil;
+
+  py::list attrs;
+
+  TERMINATE_EXECUTION_CHECK(attrs);
+
+  v8::TryCatch try_catch;
+
+  v8::Handle<v8::Array> props = Object()->GetPropertyNames();
+
+  for (size_t i=0; i<props->Length(); i++)
+  {
+    
+    attrs.append(CJavascriptObject::Wrap(Object()->Get(props->Get(v8::Integer::New(v8::Isolate::GetCurrent(), i)))));
+  }
+
+  if (try_catch.HasCaught()) CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
+
+  return attrs;
+}
+
+py::list CJavascriptObject::GetItemList(void)
+{
+  CHECK_V8_CONTEXT();
+
+  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+  CPythonGIL python_gil;
+
+  py::list attrs;
+
+  TERMINATE_EXECUTION_CHECK(attrs);
+
+  v8::TryCatch try_catch;
+
+  v8::Handle<v8::Array> props = Object()->GetPropertyNames();
+
+  for (size_t i=0; i<props->Length(); i++)
+  {
+    v8::Handle<v8::Value> prop = props->Get(v8::Integer::New(v8::Isolate::GetCurrent(), i));
+    attrs.append(py::make_tuple(CJavascriptObject::Wrap(prop),
+				CJavascriptObject::Wrap(Object()->Get(prop))));
+  }
+
+  if (try_catch.HasCaught()) CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
+
+  return attrs;
+}
+
+py::object CJavascriptObject::GetAttrIter(void)
+{
+  CHECK_V8_CONTEXT();
+
+  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+  CPythonGIL python_gil;
+
+  py::list attrs;
+
+  TERMINATE_EXECUTION_CHECK(attrs);
+
+  v8::TryCatch try_catch;
+
+  v8::Handle<v8::Value> js_props = Object()->GetPropertyNames();
+  py::object props = CJavascriptObject::Wrap(js_props);
+  
+  py::object ret(props.attr("__iter__")());
+
+  if (try_catch.HasCaught()) CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
+
+  return ret;
+}
+
+py::object CJavascriptObject::GetItemIter(void)
+{
+  CHECK_V8_CONTEXT();
+
+  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+  CPythonGIL python_gil;
+
+  v8::TryCatch try_catch;
+
+  py::object ret = py_object_via_shared(new CJavascriptObjectItemIterator(Object()));
+
+  if (try_catch.HasCaught()) CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
+
+  return ret;
+}
+
+py::object CJavascriptObject::GetValueIter(void)
+{
+  CHECK_V8_CONTEXT();
+
+  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+  CPythonGIL python_gil;
+
+  v8::TryCatch try_catch;
+
+  py::object ret = py_object_via_shared(new CJavascriptObjectValueIterator(Object()));
+
+  if (try_catch.HasCaught()) CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
+
+  return ret;
 }
 
 int CJavascriptObject::GetIdentityHash(void)
@@ -1902,6 +2043,86 @@ void ContextTracer::Trace(v8::Handle<v8::Context> ctxt, LivingMap *living)
 void ContextTracer::Trace(void)
 {
   m_ctxt.SetWeak(this, WeakCallback);
+}
+
+
+CJavascriptObjectItemIterator::CJavascriptObjectItemIterator(v8::Handle<v8::Object> obj)
+  :m_obj(v8::Isolate::GetCurrent(), obj),
+   m_props(v8::Isolate::GetCurrent(), obj->GetPropertyNames()),
+   i(0)
+{
+}
+
+CJavascriptObjectItemIterator::~CJavascriptObjectItemIterator()
+{
+  m_obj.Reset();
+  m_props.Reset();
+}
+
+py::object CJavascriptObjectItemIterator::Next()
+{
+  CPythonGIL python_gil;
+
+  CHECK_V8_CONTEXT();
+
+  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+
+  v8::TryCatch try_catch;
+
+  v8::Local<v8::Array> l_props = v8::Local<v8::Array>::New(v8::Isolate::GetCurrent(),m_props);
+  v8::Local<v8::Object> l_obj = v8::Local<v8::Object>::New(v8::Isolate::GetCurrent(),m_obj);
+
+  if (i>=l_props->Length()) {
+    PyErr_SetNone(PyExc_StopIteration);
+    py::throw_error_already_set();
+  }
+    
+  v8::Handle<v8::Value> prop = l_props->Get(v8::Integer::New(v8::Isolate::GetCurrent(), i++));
+
+  py::object ret = py::make_tuple(CJavascriptObject::Wrap(prop),
+				  CJavascriptObject::Wrap(l_obj->Get(prop)));
+  if (try_catch.HasCaught()) CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
+
+  return ret;
+}
+
+CJavascriptObjectValueIterator::CJavascriptObjectValueIterator(v8::Handle<v8::Object> obj)
+  :m_obj(v8::Isolate::GetCurrent(), obj),
+   m_props(v8::Isolate::GetCurrent(), obj->GetPropertyNames()),
+   i(0)
+{
+}
+
+CJavascriptObjectValueIterator::~CJavascriptObjectValueIterator()
+{
+  m_obj.Reset();
+  m_props.Reset();
+}
+
+py::object CJavascriptObjectValueIterator::Next()
+{
+  CPythonGIL python_gil;
+
+  CHECK_V8_CONTEXT();
+
+  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+
+  v8::TryCatch try_catch;
+
+  v8::Local<v8::Array> l_props = v8::Local<v8::Array>::New(v8::Isolate::GetCurrent(),m_props);
+  v8::Local<v8::Object> l_obj = v8::Local<v8::Object>::New(v8::Isolate::GetCurrent(),m_obj);
+
+  if (i>=l_props->Length()) {
+    PyErr_SetNone(PyExc_StopIteration);
+    py::throw_error_already_set();
+  }
+
+  v8::Handle<v8::Value> prop = l_props->Get(v8::Integer::New(v8::Isolate::GetCurrent(), i++));
+  py::object ret = CJavascriptObject::Wrap(l_obj->Get(prop));
+
+  if (try_catch.HasCaught()) CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
+
+  return ret;
 }
 
 #endif // SUPPORT_TRACE_LIFECYCLE
