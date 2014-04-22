@@ -1179,14 +1179,14 @@ py::object CJavascriptObject::Wrap(v8::Handle<v8::Value> value, v8::Handle<v8::O
   if (value->IsString())
   {
     v8::String::Utf8Value str(v8::Handle<v8::String>::Cast(value));
-
-    return py::str(*str, str.length());
+    PyObject *pyst = PyUnicode_FromStringAndSize(*str, str.length());
+    return py::object(py::handle<>(pyst));
   }
   if (value->IsStringObject())
   {
     v8::String::Utf8Value str(value.As<v8::StringObject>()->ValueOf());
-
-    return py::str(*str, str.length());
+    PyObject *pyst = PyUnicode_FromStringAndSize(*str, str.length());
+    return py::object(py::handle<>(pyst));
   }
   if (value->IsBoolean())
   {
