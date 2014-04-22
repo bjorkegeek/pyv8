@@ -96,6 +96,7 @@ namespace py = boost::python;
 
 #define PyInt_Check               PyLong_Check
 #define PyInt_AsUnsignedLongMask  PyLong_AsUnsignedLong
+#define PyInt_AsLong              PyLong_AsLong
 
 #define PySlice_Cast(obj) obj
 

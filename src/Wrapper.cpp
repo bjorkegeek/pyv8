@@ -1506,7 +1506,15 @@ py::object CJavascriptArray::GetItem(py::object key)
   }
   else if (PyInt_Check(key.ptr()) || PyLong_Check(key.ptr()))
   {
-    uint32_t idx = PyInt_Check(key.ptr()) ? (uint32_t) ::PyInt_AsUnsignedLongMask(key.ptr()) : (uint32_t) ::PyLong_AsUnsignedLong(key.ptr());
+    long t_idx = PyInt_Check(key.ptr()) ? PyInt_AsLong(key.ptr()) : PyLong_AsLong(key.ptr());
+    
+    uint32_t idx;
+    if (t_idx < 0)
+      t_idx += Length();
+    if (t_idx < 0 || t_idx > ((uint32_t)-1)) {
+      return py::object();
+    }
+    idx = (uint32_t) t_idx;
 
     if (!Object()->Has(idx)) return py::object();
 
