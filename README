@@ -1,1 +1,12 @@
+Design goals for this fork:
+
+ * Javascript strings should be represented as Unicode in Python 2
+
+ * Unicode objects passed to javascript must work
+
+ * JSObject should be more like bunch (https://pypi.python.org/pypi/bunch),
+   supporting the full python dict protocol, at least for read access
+
+ * JSArray should support as much of the python tuple protocol as possible
+
 Please refer to http://code.google.com/p/pyv8/ for more detail
