@@ -91,6 +91,7 @@ public:
   py::object GetAttrIter(void);
   py::object GetItemIter(void);
   py::object GetValueIter(void);
+  py::object Get(py::object key, py::object deflt);
 
   int GetIdentityHash(void);
   CJavascriptObjectPtr Clone(void);

@@ -92,5 +92,12 @@ class DictTests(PyV8Test):
     def test_iteritems(self):
         self.assertSeqEqual(self.py_dict.iteritems(),self.js_dict.iteritems())
 
+    def test_get(self):
+        for k in u"abc":
+            if self.py_dict.has_key(k):
+                self.assertEqual(self.py_dict[k], self.js_dict[k])
+            self.assertEqual(self.py_dict.get(k), self.js_dict.get(k))
+            self.assertEqual(self.py_dict.get(k,7), self.js_dict.get(k,7))
+
 if __name__ == '__main__':
     unittest.main()

@@ -74,6 +74,9 @@ void CWrapper::Expose(void)
     .def("iterkeys", &CJavascriptObject::GetAttrIter, "Get an iterator of an object's attributes.")
     .def("iteritems", &CJavascriptObject::GetItemIter, "Get an iterator of an object's (key,value) tuples.")
     .def("itervalues", &CJavascriptObject::GetValueIter, "Get an iterator of an object's values.")
+    .def("get", &CJavascriptObject::Get, 
+                (py::arg("key"),py::arg("default")=py::object()),
+    "Gets the value of an attribute or a default value if not found")
 
     .def("__getitem__", &CJavascriptObject::GetAttr)
     .def("__setitem__", &CJavascriptObject::SetAttr)
@@ -1197,6 +1200,26 @@ py::object CJavascriptObject::GetValueIter(void)
 
   return ret;
 }
+
+py::object CJavascriptObject::Get(py::object name, py::object deflt)
+{
+  CHECK_V8_CONTEXT();
+
+  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+
+  v8::TryCatch try_catch;
+
+  v8::Handle<v8::String> attr_name = DecodeUtf8(name);
+  v8::Handle<v8::Value> attr_value = Object()->Get(attr_name);
+
+  CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
+
+  if (attr_value.IsEmpty())
+    return deflt;
+    
+  return CJavascriptObject::Wrap(attr_value, Object());
+}
+
 
 int CJavascriptObject::GetIdentityHash(void)
 {
