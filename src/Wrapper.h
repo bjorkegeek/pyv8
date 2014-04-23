@@ -63,6 +63,7 @@ protected:
   v8::Persistent<v8::Object> m_obj;
 
   void CheckAttr(v8::Handle<v8::String> name) const;
+  void CheckKey(v8::Handle<v8::String> name) const;
 
   CJavascriptObject()
   {
@@ -84,6 +85,10 @@ public:
   py::object GetAttr(const std::string& name);
   void SetAttr(const std::string& name, py::object value);
   void DelAttr(const std::string& name);
+
+  py::object GetItem(py::object name);
+  void SetItem(py::object name, py::object value);
+  void DelItem(py::object name);
 
   py::list GetAttrList(void);
   py::list GetValueList(void);

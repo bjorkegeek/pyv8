@@ -106,6 +106,25 @@ const std::string EncodeUtf8(const std::wstring& str)
   return std::string((const char *) &data[0], data.size());
 }
 
+
+v8::Handle<v8::String> ToPropertyName(py::object key)
+{
+  py::object utf8_name;
+  if (PyString_Check(key.ptr())) {
+    utf8_name = key;
+  } else {
+    py::object uc_name(py::handle<>(PyObject_Unicode(key.ptr())));
+    utf8_name = py::object(py::handle<>(PyUnicode_AsUTF8String(key.ptr())));
+  }
+  char *buf;
+  Py_ssize_t len;
+  PyString_AsStringAndSize(utf8_name.ptr(), &buf, &len);
+  return v8::String::NewFromUtf8(v8::Isolate::GetCurrent(), 
+				 buf, 
+				 v8::String::kNormalString, 
+				 len);
+}
+
 CPythonGIL::CPythonGIL()
 {
   m_state = ::PyGILState_Ensure();

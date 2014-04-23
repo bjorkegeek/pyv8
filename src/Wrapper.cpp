@@ -78,9 +78,9 @@ void CWrapper::Expose(void)
                 (py::arg("key"),py::arg("default")=py::object()),
     "Gets the value of an attribute or a default value if not found")
 
-    .def("__getitem__", &CJavascriptObject::GetAttr)
-    .def("__setitem__", &CJavascriptObject::SetAttr)
-    .def("__delitem__", &CJavascriptObject::DelAttr)
+    .def("__getitem__", &CJavascriptObject::GetItem)
+    .def("__setitem__", &CJavascriptObject::SetItem)
+    .def("__delitem__", &CJavascriptObject::DelItem)
 
     .def("__contains__", &CJavascriptObject::Contains)
 
@@ -995,6 +995,22 @@ void CJavascriptObject::CheckAttr(v8::Handle<v8::String> name) const
   }
 }
 
+void CJavascriptObject::CheckKey(v8::Handle<v8::String> name) const
+{
+  assert(v8::Isolate::GetCurrent()->InContext());
+
+  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+
+  if (!Object()->Has(name))
+  {
+    std::ostringstream msg;
+
+    msg << "'" << *v8::String::Utf8Value(name) << "'";
+
+    throw CJavascriptException(msg.str(), ::PyExc_KeyError);
+  }
+}
+
 py::object CJavascriptObject::GetAttr(const std::string& name)
 {
 #ifdef SUPPORT_PROBES
@@ -1063,6 +1079,61 @@ void CJavascriptObject::DelAttr(const std::string& name)
   v8::Handle<v8::String> attr_name = DecodeUtf8(name);
 
   CheckAttr(attr_name);
+
+  if (!Object()->Delete(attr_name))
+    CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
+}
+
+py::object CJavascriptObject::GetItem(py::object name)
+{
+  CHECK_V8_CONTEXT();
+
+  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+
+  v8::TryCatch try_catch;
+
+  v8::Handle<v8::String> attr_name = ToPropertyName(name);
+
+  CheckKey(attr_name);
+
+  v8::Handle<v8::Value> attr_value = Object()->Get(attr_name);
+
+  if (attr_value.IsEmpty())
+    CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
+
+  return CJavascriptObject::Wrap(attr_value, Object());
+}
+
+void CJavascriptObject::SetItem(py::object name, py::object value)
+{
+  CHECK_V8_CONTEXT();
+
+  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+
+  v8::TryCatch try_catch;
+
+  v8::Handle<v8::String> attr_name = ToPropertyName(name);
+  v8::Handle<v8::Value> attr_obj = CPythonObject::Wrap(value);
+
+  if (Object()->Has(attr_name))
+  {
+    v8::Handle<v8::Value> UNUSED_VAR(attr_value) = Object()->Get(attr_name);
+  }
+
+  if (!Object()->Set(attr_name, attr_obj))
+    CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
+}
+void CJavascriptObject::DelItem(py::object name)
+{
+  CHECK_V8_CONTEXT();
+
+  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+
+  v8::TryCatch try_catch;
+
+  v8::Handle<v8::String> attr_name = ToPropertyName(name);
+
+  CheckKey(attr_name);
 
   if (!Object()->Delete(attr_name))
     CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
@@ -1209,12 +1280,12 @@ py::object CJavascriptObject::Get(py::object name, py::object deflt)
 
   v8::TryCatch try_catch;
 
-  v8::Handle<v8::String> attr_name = DecodeUtf8(name);
+  v8::Handle<v8::String> attr_name = ToPropertyName(name);
   v8::Handle<v8::Value> attr_value = Object()->Get(attr_name);
 
   CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
 
-  if (attr_value.IsEmpty())
+  if (attr_value->IsUndefined())
     return deflt;
     
   return CJavascriptObject::Wrap(attr_value, Object());
