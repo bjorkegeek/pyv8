@@ -77,7 +77,7 @@ void CWrapper::Expose(void)
     .def("get", &CJavascriptObject::Get, 
                 (py::arg("key"),py::arg("default")=py::object()),
     "Gets the value of an attribute or a default value if not found")
-
+    .def("has_key", &CJavascriptObject::HasKey, "Returns true if the given attribute exists in the object")
     .def("__getitem__", &CJavascriptObject::GetItem)
     .def("__setitem__", &CJavascriptObject::SetItem)
     .def("__delitem__", &CJavascriptObject::DelItem)
@@ -1289,6 +1289,22 @@ py::object CJavascriptObject::Get(py::object name, py::object deflt)
     return deflt;
     
   return CJavascriptObject::Wrap(attr_value, Object());
+}
+
+bool CJavascriptObject::HasKey(py::object name)
+{
+  CHECK_V8_CONTEXT();
+
+  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+
+  v8::TryCatch try_catch;
+
+  v8::Handle<v8::String> attr_name = ToPropertyName(name);
+  bool ret = Object()->Has(attr_name);
+
+  CJavascriptException::ThrowIf(v8::Isolate::GetCurrent(), try_catch);
+
+  return ret;
 }
 
 

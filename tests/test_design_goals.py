@@ -92,6 +92,11 @@ class DictTests(PyV8Test):
     def test_iteritems(self):
         self.assertSeqEqual(self.py_dict.iteritems(),self.js_dict.iteritems())
 
+    def test_has_key(self):
+        for k in self.py_dict.keys():
+            self.assertTrue(self.js_dict.has_key(k))
+        self.assertFalse(self.js_dict.has_key(u"not_in"))
+
     def test_get(self):
         for k in u"abc":
             if self.py_dict.has_key(k):
