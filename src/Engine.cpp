@@ -33,18 +33,18 @@ struct MemoryAllocationCallbackStub : public MemoryAllocationCallbackBase
   {
     lock_guard_t hold(s_callbackLock);
 
-    if (!s_callback.is_none()) s_callback(space, action, size);
+    if (!is_none(s_callback)) s_callback(space, action, size);
   }
 
   virtual void Set(py::object callback)
   {
     lock_guard_t hold(s_callbackLock);
 
-    if (s_callback.is_none() && !callback.is_none())
+    if (is_none(s_callback) && !is_none(callback))
     {
       v8::V8::AddMemoryAllocationCallback(&onMemoryAllocation, SPACE, ACTION);
     }
-    else if (!s_callback.is_none() && callback.is_none())
+    else if (!is_none(s_callback) && is_none(callback))
     {
       v8::V8::RemoveMemoryAllocationCallback(&onMemoryAllocation);
     }
@@ -297,7 +297,7 @@ void CEngine::Deserialize(py::object snapshot)
 {
   Py_buffer buf;
 
-  if (!snapshot.is_none() && PyObject_CheckBuffer(snapshot.ptr()))
+  if (!is_none(snapshot)) && PyObject_CheckBuffer(snapshot.ptr()))
   {
     if (0 == ::PyObject_GetBuffer(snapshot.ptr(), &buf, PyBUF_WRITABLE))
     {
@@ -420,7 +420,7 @@ boost::shared_ptr<CScript> CEngine::InternalCompile(v8::Handle<v8::String> src,
   v8::Handle<v8::String> source = v8::Local<v8::String>::New(m_isolate, script_source);
   std::auto_ptr<v8::ScriptData> script_data;
 
-  if (!precompiled.is_none())
+  if (!is_none(precompiled))
   {
     if (PyObject_CheckBuffer(precompiled.ptr()))
     {
@@ -605,7 +605,7 @@ class CPythonExtension : public v8::Extension
       break;
     }
 
-    if (result.is_none()) {
+    if (is_none(result)) {
       args.GetReturnValue().SetNull();
     } else if (result.ptr() == Py_True) {
       args.GetReturnValue().Set(true);

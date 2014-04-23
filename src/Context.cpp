@@ -133,7 +133,7 @@ CContext::CContext(py::object global, py::list extensions)
 
   v8::Context::Scope context_scope(Handle());
 
-  if (!global.is_none())
+  if (!is_none(global))
   {
     Handle()->Global()->Set(v8::String::NewFromUtf8(v8::Isolate::GetCurrent(), "__proto__"), CPythonObject::Wrap(global));
 
@@ -165,7 +165,7 @@ void CContext::SetSecurityToken(py::str token)
 {
   v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
 
-  if (token.is_none())
+  if (is_none(token))
   {
     Handle()->UseDefaultSecurityToken();
   }

@@ -431,7 +431,7 @@ void CJavascriptException::PrintCallStack(py::object file)
 {
   CPythonGIL python_gil;
 
-  PyObject *out = file.is_none() ? ::PySys_GetObject((char *) "stdout") : file.ptr();
+  PyObject *out = is_none(file) ? ::PySys_GetObject((char *) "stdout") : file.ptr();
 
   int fd = ::PyObject_AsFileDescriptor(out);
 

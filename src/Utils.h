@@ -143,3 +143,9 @@ typedef const char * string_t;
 #include "probes.h"
 
 #endif
+
+#if BOOST_VERSION<104300
+inline static bool is_none(const py::object &o) { return o.ptr() == Py_None; }
+#else
+inline static bool is_none(const py::object &o) { return o.is_none(); }
+#endif
