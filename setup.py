@@ -376,8 +376,10 @@ def checkout_v8():
     if update_code:
         s = exec_cmd([GIT_BIN,"fetch"],"Fetching V8 updates", shell=False)
     else:
+        exec_cmd(["/usr/bin/mkdir","-p",os.path.dirname(V8_HOME)],
+                 "Preparing build directory", shell=False, cwd=None)
         s = exec_cmd([GIT_BIN,"clone",V8_GIT_URL, V8_HOME],
-                     "Cloning V8 repository", shell=False)
+                     "Cloning V8 repository", shell=False, cwd=None)
 
     if s:
         s = exec_cmd([GIT_BIN,"checkout",V8_GIT_COMMIT],
@@ -411,7 +413,7 @@ def prepare_gyp():
         if os.path.isdir(gypdir):
             cmdline = 'cd '+gypdir+'; git fetch'
         else:
-            cmdline = 'cd '+gypdir+'; git clone https://chromium.googlesource.com/external/gyp ' + gypdir
+            cmdline = 'git clone https://chromium.googlesource.com/external/gyp ' + gypdir
         exec_cmd(cmdline, "Fetch GYP from git")
         #else:
         #    cmdline = MAKE + ' dependencies'
