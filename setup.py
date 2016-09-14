@@ -374,15 +374,18 @@ def checkout_v8():
     update_code = os.path.isdir(V8_HOME) and os.path.exists(os.path.join(V8_HOME, 'include', 'v8.h'))
 
     if update_code:
-        r = subprocess.call([GIT_BIN,"-C",V8_HOME,"fetch"])
+        s = exec_cmd([GIT_BIN,"fetch"],"Fetching V8 updates", shell=False)
     else:
-        r = subprocess.call([GIT_BIN,"clone",V8_GIT_URL, V8_HOME])
+        s = exec_cmd([GIT_BIN,"clone",V8_GIT_URL, V8_HOME],
+                     "Cloning V8 repository", shell=False)
 
-    if r == 0:
-        r = subprocess.call([GIT_BIN,"-C",V8_HOME,"checkout",V8_GIT_COMMIT])
+    if s:
+        s = exec_cmd([GIT_BIN,"checkout",V8_GIT_COMMIT],
+                     "Checking out desired version", shell=False)
 
-    if r == 0:
-        p = subprocess.Popen([GIT_BIN, "-C", V8_HOME, "rev-parse", "HEAD"],
+    if s:
+        p = subprocess.Popen([GIT_BIN, "rev-parse", "HEAD"],
+                             cwd=V8_HOME,
                              stdout=subprocess.PIPE)
         revision, err = p.communicate()
         revision = revision.strip()
@@ -406,14 +409,14 @@ def prepare_gyp():
         #if is_winnt:
         gypdir = os.path.join(V8_HOME, 'build', 'gyp')
         if os.path.isdir(gypdir):
-            cmdline = 'git -C ' + gypdir + ' fetch'
+            cmdline = 'cd '+gypdir+'; git fetch'
         else:
-            cmdline = 'git clone https://chromium.googlesource.com/external/gyp ' + gypdir
+            cmdline = 'cd '+gypdir+'; git clone https://chromium.googlesource.com/external/gyp ' + gypdir
         exec_cmd(cmdline, "Fetch GYP from git")
         #else:
         #    cmdline = MAKE + ' dependencies'
 
-        cmdline = 'git -C build/gyp checkout a3e2a5caf24a1e0a45401e09ad131210bf16b852'
+        cmdline = 'cd '+gypdir+';git checkout a3e2a5caf24a1e0a45401e09ad131210bf16b852'
         exec_cmd(cmdline, "Check out correct GYP commit")
     except Exception as e:
         print("ERROR: fail to install GYP: %s" % e)
