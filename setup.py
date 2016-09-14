@@ -42,17 +42,20 @@ BOOST_HOME = None
 BOOST_MT = is_osx
 BOOST_STATIC_LINK = False
 PYTHON_HOME = None
+DEPOT_TOOLS_URL = "https://chromium.googlesource.com/chromium/tools/depot_tools.git"
 V8_HOME = None
-V8_SVN_URL = "http://v8.googlecode.com/svn/trunk/"
-V8_SVN_REVISION = None
+V8_GIT_URL = "https://chromium.googlesource.com/v8/v8"
+V8_GIT_COMMIT = None
 
-v8_svn_rev_file = os.path.normpath(os.path.join(os.path.dirname(__file__), 'REVISION'))
+v8_git_commit_file = os.path.normpath(os.path.join(os.path.dirname(__file__), 'REVISION'))
 
-if os.path.exists(v8_svn_rev_file):
+if os.path.exists(v8_git_commit_file):
     try:
-        V8_SVN_REVISION = int(open(v8_svn_rev_file).read().strip())
+        V8_GIT_COMMIT = open(v8_git_commit_file).read().strip()
+        if len(V8_GIT_COMMIT) != 40:
+            raise ValueError("SHA length error")
     except ValueError:
-        print("WARN: invalid revision number in REVISION file")
+        print("WARN: invalid git commit SHA in REVISION file")
 
 INCLUDE = None
 LIB = None
@@ -86,8 +89,9 @@ PYV8_HOME = os.environ.get('PYV8_HOME', PYV8_HOME)
 BOOST_HOME = os.environ.get('BOOST_HOME', BOOST_HOME)
 BOOST_MT = os.environ.get('BOOST_MT', BOOST_MT)
 PYTHON_HOME = os.environ.get('PYTHON_HOME', PYTHON_HOME)
+DEPOT_TOOLS_URL = os.environ.get('DEPOT_TOOLS_URL', DEPOT_TOOLS_URL)
 V8_HOME = os.environ.get('V8_HOME', V8_HOME)
-V8_SVN_URL = os.environ.get('V8_SVN_URL', V8_SVN_URL)
+V8_GIT_URL = os.environ.get('V8_GIT_URL', V8_GIT_URL)
 INCLUDE = os.environ.get('INCLUDE', INCLUDE)
 LIB = os.environ.get('LIB', LIB)
 DEBUG = os.environ.get('DEBUG', DEBUG)
@@ -99,11 +103,11 @@ if type(DEBUG) == str:
 if V8_HOME is None or not os.path.exists(os.path.join(V8_HOME, 'include', 'v8.h')):
     print("WARN: V8_HOME doesn't exists or point to a wrong folder, ")
 
-    V8_HOME = os.path.join(PYV8_HOME, 'build', ('v8_r%d' % V8_SVN_REVISION) if V8_SVN_REVISION else 'v8')
+    V8_HOME = os.path.join(PYV8_HOME, 'build', 'v8')
 
-    svn_name = None
+    git_name = None
 else:
-    svn_name = ('SVN r%d' % V8_SVN_REVISION) if V8_SVN_REVISION else 'the latest SVN trunk'
+    git_name = ('GIT %s' % V8_GIT_COMMIT) if V8_GIT_COMMIT else 'the latest git trunk'
 
     print("INFO: Found Google v8 base on V8_HOME <%s>" % V8_HOME)
 
@@ -340,64 +344,58 @@ def exec_cmd(cmdline_or_args, msg, shell=True, cwd=V8_HOME, env=None, output=Fal
 
     return succeeded, out, err if output else succeeded
 
+def which(program):
+    def is_exe(fpath):
+        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+    fpath, fname = os.path.split(program)
+    if fpath:
+        if is_exe(program):
+            return program
+    else:
+        for path in os.environ["PATH"].split(os.pathsep):
+            path = path.strip('"')
+            exe_file = os.path.join(path, program)
+            if is_exe(exe_file):
+                return exe_file
+
+    return None
 
 def checkout_v8():
-    if svn_name:
-        print("INFO: we will try to update v8 to %s at <%s>" % (svn_name, V8_SVN_URL))
+    GIT_BIN = which("git")
+    if git_name:
+        print("INFO: we will try to update v8 to %s at <%s>" % (git_name, V8_GIT_URL))
     else:
-        print("INFO: we will try to checkout and build a private v8 build from <%s>." % V8_SVN_URL)
+        print("INFO: we will try to checkout and build a private v8 build from <%s>." % V8_GIT_URL)
 
     print("=" * 20)
-    print("INFO: Checking out or Updating Google V8 code from SVN...\n")
+    print("INFO: Checking out or Updating Google V8 code from git...\n")
 
     update_code = os.path.isdir(V8_HOME) and os.path.exists(os.path.join(V8_HOME, 'include', 'v8.h'))
 
-    try:
-        from pysvn import Client, Revision, opt_revision_kind
-
-        svnClient = Client()
-        rev = Revision(opt_revision_kind.number, V8_SVN_REVISION) if V8_SVN_REVISION else Revision(opt_revision_kind.head)
-
-        if update_code:
-            r = svnClient.update(V8_HOME, revision=rev)
-        else:
-            r = svnClient.checkout(V8_SVN_URL, V8_HOME, revision=rev)
-
-        if r:
-            print("%s Google V8 code (r%d) from SVN to %s" % ("Update" if update_code else "Checkout", r[-1].number, V8_HOME))
-
-            with open(v8_svn_rev_file, 'w') as f:
-                f.write(str(r[-1].number))
-
-            return
-
-        print("ERROR: Failed to export from V8 svn repository")
-    except ImportError:
-        #print "WARN: could not import pysvn. Ensure you have the pysvn package installed."
-        #print "      on debian/ubuntu, this is called 'python-svn'; on Fedora/RHEL, this is called 'pysvn'."
-
-        print("INFO: we will try to use the system 'svn' command to checkout/update V8 code")
-
     if update_code:
-        args = ["svn", "up", V8_HOME]
+        r = subprocess.call([GIT_BIN,"-C",V8_HOME,"fetch"])
     else:
-        os.makedirs(V8_HOME)
+        r = subprocess.call([GIT_BIN,"clone",V8_GIT_URL, V8_HOME])
 
-        args = ["svn", "co", V8_SVN_URL, V8_HOME]
+    if r == 0:
+        r = subprocess.call([GIT_BIN,"-C",V8_HOME,"checkout",V8_GIT_COMMIT])
 
-    if V8_SVN_REVISION:
-        args += ['-r', str(V8_SVN_REVISION)]
+    if r == 0:
+        p = subprocess.Popen([GIT_BIN, "-C", V8_HOME, "rev-parse", "HEAD"],
+                             stdout=subprocess.PIPE)
+        revision, err = p.communicate()
+        revision = revision.strip()
+        if err != 0:
+            revision = 'unknown'
+        else:
+            print("ERROR: fail to git HEAD info, %s", err)
 
-    if exec_cmd(' '.join(args), "checkout or update Google V8 code from SVN"):
-        if not V8_SVN_REVISION:
-            ok, out, err = exec_cmd(' '.join(["svn", "info", V8_HOME]),
-                                    "save the current V8 SVN revision to REVISION file", output=True)
+        print("%s Google V8 code (%s) from git to %s" % ("Update" if update_code else "Checkout", revision, V8_HOME))
 
-            if ok:
-                with open(v8_svn_rev_file, 'w') as f:
-                    f.write(re.search(r'Revision:\s(?P<rev>\d+)', out, re.MULTILINE).groupdict()['rev'])
-            else:
-                print("ERROR: fail to fetch SVN info, %s", err)
+        if revision != 'unknown':
+            with open(v8_git_commit_file, 'w') as f:
+                f.write(revision)
 
 
 def prepare_gyp():
@@ -405,15 +403,18 @@ def prepare_gyp():
     print("INFO: Installing or updating GYP...")
 
     try:
-        if is_winnt:
-            if os.path.isdir(os.path.join(V8_HOME, 'build', 'gyp')):
-                cmdline = 'svn up build/gyp'
-            else:
-                cmdline = 'svn co http://gyp.googlecode.com/svn/trunk build/gyp'
+        #if is_winnt:
+        gypdir = os.path.join(V8_HOME, 'build', 'gyp')
+        if os.path.isdir(gypdir):
+            cmdline = 'git -C ' + gypdir + ' fetch'
         else:
-            cmdline = MAKE + ' dependencies'
+            cmdline = 'git clone https://chromium.googlesource.com/external/gyp ' + gypdir
+        exec_cmd(cmdline, "Fetch GYP from git")
+        #else:
+        #    cmdline = MAKE + ' dependencies'
 
-        exec_cmd(cmdline, "Check out GYP from SVN")
+        cmdline = 'git -C build/gyp checkout a3e2a5caf24a1e0a45401e09ad131210bf16b852'
+        exec_cmd(cmdline, "Check out correct GYP commit")
     except Exception as e:
         print("ERROR: fail to install GYP: %s" % e)
         print("       http://code.google.com/p/v8/wiki/BuildingWithGYP")
@@ -510,7 +511,7 @@ def build_v8():
 
         cmdline = "%s -j 8 %s %s.%s" % (MAKE, options, arch, mode)
 
-        exec_cmd(cmdline, "build v8 from SVN")
+        exec_cmd(cmdline, "build v8 from git")
 
 
 def generate_probes():
